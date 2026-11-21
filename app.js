@@ -1,6 +1,8 @@
 const KAT = {
   pengeluaran: ['Makan & Minum','Transportasi & Bensin','Belanja Harian','Tagihan & Utilitas','Pulsa & Internet','Tempat Tinggal','Kesehatan','Pendidikan','Hiburan','Belanja Pribadi','Sosial & Donasi','Cicilan','Tabungan & Investasi','Lainnya'],
   pemasukan: ['Gaji','Pendapatan','Freelance','Uang Bulanan','Investasi','Hadiah','Lainnya']
+  KAT.pengeluaran.unshift('Celengan');
+  KAT.pemasukan.unshift('Celengan');
 };
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const rp = n => (n < 0 ? '-' : '') + 'Rp ' + Math.round(Math.abs(n)).toLocaleString('id-ID');
@@ -64,7 +66,11 @@ function home() {
   const top = Object.entries(bk).sort((a, b) => b[1] - a[1])[0];
   const end = r[1] < today() ? r[1] : today(), days = Math.max(1, diff(r[0], end) + 1);
   const ch = pout ? (out - pout) / pout * 100 : null;
+  const cl = DATA.filter(t => t.kategori.trim().toLowerCase() === 'celengan');
+  const cin = sum(cl, 'pemasukan'), cout = sum(cl, 'pengeluaran');
   $('#home').innerHTML = `
+  <div class="card hero"><small>🐷 Celengan</small><b>${rp(cin - cout)}</b>
+  <div class="two"><div><small>Pemasukan</small><b>${rp(cin)}</b></div><div><small>Pengeluaran</small><b>${rp(cout)}</b></div></div></div>
   <div class="card hero"><small>Saldo bersih</small><b>${rp(inc - out)}</b>
     <div class="two"><div><small>Pemasukan</small><b>${rp(inc)}</b></div><div><small>Pengeluaran</small><b>${rp(out)}</b></div></div></div>
   <div class="card"><h3 style="margin:0 0 6px">Insight</h3>
