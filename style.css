@@ -48,3 +48,8 @@ nav button i{font-style:normal;font-size:20px}nav button.on{color:var(--v);font-
 #toast.on{opacity:1;transform:translate(-50%,0)}#toast.bad{background:var(--out)}
 canvas{max-height:260px}
 [hidden]{display:none!important}
+.an{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--l)}
+.an:last-of-type{border:0}
+.an i{font-style:normal;font-size:20px}
+.an small{color:var(--m);display:block;margin-top:2px}
+.st{display:inline-block;padding:6px 12px;border-radius:999px;font-weight:600;font-size:14px;background:#f1f3fa;margin-bottom:6px}
