@@ -70,7 +70,7 @@ function home() {
   $('#home').innerHTML = `
   <div class="card hero"><small>Saldo bersih</small><b>${rp(inc - out)}</b>
     <div class="two"><div><small>Pemasukan</small><b>${rp(inc)}</b></div><div><small>Pengeluaran</small><b>${rp(out)}</b></div></div></div>
-  <div class="card hero"><small>🐷 Celengan</small><b>${rp(cin - cout)}</b>
+  <div class="card hero"><small>Celengan</small><b>${rp(cin - cout)}</b>
     <div class="two"><div><small>Pemasukan</small><b>${rp(cin)}</b></div><div><small>Pengeluaran</small><b>${rp(cout)}</b></div></div></div>
   <div class="card"><h3 style="margin:0 0 6px">Insight</h3>
     <div class="ins"><span>Pengeluaran terbesar</span><b>${top ? esc(top[0]) + ' · ' + rp(top[1]) : '-'}</b></div>
