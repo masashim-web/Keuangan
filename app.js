@@ -120,10 +120,12 @@ function openSheet(t) {
   if (t && !KAT[S.jenis].includes(t.kategori)) KAT[S.jenis].unshift(t.kategori);
   $$('#jenis button').forEach(b => b.classList.toggle('on', b.dataset.j === S.jenis));
   $('#nom').value = t ? t.jumlah.toLocaleString('id-ID') : '';
-  $('#tgl').value = t ? t.tanggal : today(); $('#cat').value = t ? t.catatan : '';
+  $('#tgl').value = t ? t.tanggal : today(); $('#cat').value = t ? t.catatan : ''; hari();
   $('#err').textContent = ''; $('#hapus').hidden = !t; $('#simpan').textContent = t ? 'Simpan Perubahan' : 'Simpan';
   drawKats(); $('#sheet').hidden = false; setTimeout(() => $('#nom').focus(), 150);
 }
+function hari() { $('#hr').textContent = $('#tgl').value ? '· ' + HARI[parse($('#tgl').value).getDay()] : ''; }
+$('#tgl').onchange = hari;
 const closeSheet = () => $('#sheet').hidden = true;
 
 async function simpan() {
