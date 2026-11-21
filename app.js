@@ -9,7 +9,8 @@ const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
 const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
 const diff = (a, b) => Math.round((parse(b) - parse(a)) / 864e5);
-const fmt = s => parse(s).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const fmt = s => { const d = parse(s); return HARI[d.getDay()] + ' ' + d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }); };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const inR = (t, r) => t.tanggal >= r[0] && t.tanggal <= r[1];
 const sum = (a, j) => a.filter(t => t.jenis === j).reduce((s, t) => s + t.jumlah, 0);
