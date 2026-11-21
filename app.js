@@ -1,9 +1,8 @@
 const KAT = {
-  pengeluaran: ['Makan & Minum','Transportasi & Bensin','Belanja Harian','Tagihan & Utilitas','Pulsa & Internet','Tempat Tinggal','Kesehatan','Pendidikan','Hiburan','Belanja Pribadi','Sosial & Donasi','Cicilan','Tabungan & Investasi','Lainnya'],
-  pemasukan: ['Gaji','Pendapatan','Freelance','Uang Bulanan','Investasi','Hadiah','Lainnya']
-  KAT.pengeluaran.unshift('Celengan');
-  KAT.pemasukan.unshift('Celengan');
+  pengeluaran: ['Celengan','Makan & Minum','Transportasi','Belanja Harian','Tagihan & Utilitas','Pulsa & Internet','Tempat Tinggal','Kesehatan','Pendidikan','Hiburan','Belanja Pribadi','Sosial & Donasi','Cicilan','Tabungan & Investasi','Lainnya'],
+  pemasukan: ['Celengan','Gaji','Bonus','Freelance','Usaha','Investasi','Hadiah','Lainnya']
 };
+
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const rp = n => (n < 0 ? '-' : '') + 'Rp ' + Math.round(Math.abs(n)).toLocaleString('id-ID');
 const pad = n => String(n).padStart(2, '0');
@@ -69,10 +68,10 @@ function home() {
   const cl = DATA.filter(t => t.kategori.trim().toLowerCase() === 'celengan');
   const cin = sum(cl, 'pemasukan'), cout = sum(cl, 'pengeluaran');
   $('#home').innerHTML = `
-  <div class="card hero"><small>🐷 Celengan</small><b>${rp(cin - cout)}</b>
-  <div class="two"><div><small>Pemasukan</small><b>${rp(cin)}</b></div><div><small>Pengeluaran</small><b>${rp(cout)}</b></div></div></div>
   <div class="card hero"><small>Saldo bersih</small><b>${rp(inc - out)}</b>
     <div class="two"><div><small>Pemasukan</small><b>${rp(inc)}</b></div><div><small>Pengeluaran</small><b>${rp(out)}</b></div></div></div>
+  <div class="card hero"><small>🐷 Celengan</small><b>${rp(cin - cout)}</b>
+    <div class="two"><div><small>Pemasukan</small><b>${rp(cin)}</b></div><div><small>Pengeluaran</small><b>${rp(cout)}</b></div></div></div>
   <div class="card"><h3 style="margin:0 0 6px">Insight</h3>
     <div class="ins"><span>Pengeluaran terbesar</span><b>${top ? esc(top[0]) + ' · ' + rp(top[1]) : '-'}</b></div>
     <div class="ins"><span>Rata-rata harian</span><b>${rp(out / days)}</b></div>
