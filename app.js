@@ -110,7 +110,13 @@ function charts() {
   const e = Object.entries(bk).sort((a, b) => b[1] - a[1]);
   const pal = ['#4f7cff', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b'];
   const y = { ticks: { callback: v => v >= 1e6 ? v / 1e6 + 'jt' : v / 1e3 + 'rb' } }, tip = { callbacks: { label: c => ' ' + rp(c.raw) } };
-  CH.push(new Chart($('#c0'), { type: 'doughnut', data: { labels: e.map(x => x[0]), datasets: [{ data: e.map(x => x[1]), backgroundColor: pal }] }, options: { plugins: { tooltip: tip, legend: { position: 'bottom' } } } }));
+  const totalK = e.reduce((s, x) => s + x[1], 0);
+  const pct = v => (v / totalK * 100).toFixed(1).replace('.', ',') + '%';
+  const tipPct = { callbacks: { label: c => ' ' + rp(c.raw) + ' (' + pct(c.raw) + ')' } };
+  CH.push(new Chart($('#c0'), { type: 'doughnut', data: { labels: e.map(x => x[0]), datasets: [{ data: e.map(x => x[1]), backgroundColor: pal }] }, options: { plugins: { tooltip: tipPct, legend: { position: 'bottom' } } } }));
+  $('#c0').parentNode.insertAdjacentHTML('beforeend', e.length
+  ? e.map(x => `<div class="ins"><span>${esc(x[0])}</span><b>${rp(x[1])} (${pct(x[1])})</b></div>`).join('')
+  : '<div class="empty">Belum ada pengeluaran di periode ini.</div>');
   const b = bucket(S.mode, r);
   CH.push(new Chart($('#c1'), { type: 'line', data: { labels: b.labels, datasets: [{ data: b.out, borderColor: '#8b5cf6', backgroundColor: '#8b5cf622', fill: true, tension: .35 }] }, options: { plugins: { legend: { display: false }, tooltip: tip }, scales: { y } } }));
   CH.push(new Chart($('#c2'), { type: 'bar', data: { labels: b.labels, datasets: [{ label: 'Pemasukan', data: b.inc, backgroundColor: '#10b981' }, { label: 'Pengeluaran', data: b.out, backgroundColor: '#ef4444' }] }, options: { plugins: { tooltip: tip, legend: { position: 'bottom' } }, scales: { y } } }));
