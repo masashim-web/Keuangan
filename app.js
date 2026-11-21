@@ -216,10 +216,34 @@ function analisis(r) {
     L.push(row('🔮', `Proyeksi pengeluaran akhir bulan: ${rp(proj)}`, inc > 0 && proj > inc ? `Dengan laju sekarang, bisa melebihi pemasukan bulan ini (${rp(inc)}).` : 'Berdasarkan laju harianmu saat ini, belum termasuk tabungan.'));
   }
 
-  const tip = rasio !== null && rasio < 20 && top ? `Langkah kecil: kurangi ${esc(top[0])} sebesar 10% (hemat sekitar ${rp(top[1] * .1)}).`
-    : rasio !== null && rasio >= 20 ? 'Pindahkan sebagian sisa dana ke Celengan agar tidak habis tanpa terasa.'
-    : 'Catat pemasukan dan pengeluaran rutin supaya analisis makin akurat.';
-  L.push(row('🎯', 'Rekomendasi', tip));
+  const urut = Object.entries(bk).sort((a, b) => b[1] - a[1]);
+  const flek = ['hiburan', 'belanja pribadi', 'makan & minum', 'sosial & donasi', 'lainnya'];
+  const wajib = ['tempat tinggal', 'tagihan & utilitas', 'cicilan', 'kesehatan', 'pendidikan', 'pulsa & internet'];
+  const jenisK = k => wajib.includes(k.trim().toLowerCase()) ? 'wajib' : flek.includes(k.trim().toLowerCase()) ? 'flek' : 'lain';
+  const potensi = urut.filter(x => jenisK(x[0]) !== 'wajib').reduce((s, x) => s + x[1] * .1, 0);
+
+  if (rasio === null) L.push(row('🎯', 'Rekomendasi', 'Catat pemasukanmu dulu supaya evaluasi bisa lebih akurat.'));
+  else if (rasio >= 20) L.push(row('🌟', 'Apresiasi', `Disiplinmu terlihat: ${rasio.toFixed(0)}% pemasukan masih tersisa. Meski sudah sehat, tetap ada ruang perbaikan di bawah ini supaya tabunganmu makin kuat.`));
+  else if (rasio >= 0) L.push(row('🎯', 'Target: sisa 20% pemasukan', `Kamu perlu menghemat sekitar ${rp(K - inc * .8)} lagi di periode ini untuk mencapainya. Kamu sudah dekat, jadi fokus pada pos di bawah ini.`));
+  else L.push(row('🚨', 'Prioritas: tutup defisit', `Kurangi pengeluaran minimal ${rp(K - inc)} atau tambah pemasukan. Tunda dulu pembelian yang bukan kebutuhan wajib.`));
+
+  urut.slice(0, 3).forEach(([k, v], i) => {
+    const p = v / K * 100, j = jenisK(k), h = v * .1;
+    const saran = j === 'wajib' ? 'Termasuk kebutuhan wajib. Cek apakah ada tagihan atau langganan yang bisa dinegosiasikan atau diganti paket lebih murah.'
+      : j === 'flek' ? `Pos yang bisa diatur. Kurangi 10% = hemat ${rp(h)} (sekitar ${rp(h / days)} per hari).`
+      : `Pantau polanya: cari transaksi yang paling sering atau paling besar, lalu tentukan batas per minggu. Hemat 10% = ${rp(h)}.`;
+    L.push(row(['🥇', '🥈', '🥉'][i], `${esc(k)}: ${rp(v)} (${p.toFixed(0)}%)`, saran));
+  });
+
+  if (K > 0) {
+    let pen;
+    if (rasio !== null && rasio >= 20) pen = `Pindahkan ${rp((inc - K) * .5)} (setengah dari sisa) ke Celengan lebih dulu, lalu coba hemat 10% di pos non-wajib. Potensi tambahan ${rp(potensi)}.`;
+    else if (rasio !== null) {
+      const gap = rasio >= 0 ? K - inc * .8 : K - inc;
+      pen = `Hemat 10% di semua pos non-wajib = ${rp(potensi)}. ` + (potensi >= gap ? 'Ini sudah cukup untuk mencapai targetmu.' : 'Belum cukup sendirian, pertimbangkan menunda pembelian besar atau menambah pemasukan.');
+    } else pen = `Mulai dengan hemat 10% di pos non-wajib. Potensinya ${rp(potensi)}.`;
+    L.push(row('🎯', 'Langkah berikutnya', pen));
+  }
 
   return wrap((st ? `<span class="st" style="color:${st[1]}">${st[0]}</span>` : '') + L.join('') +
     '<small style="color:var(--m)">Analisis berdasarkan catatanmu pada periode yang dipilih.</small>');
