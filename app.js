@@ -106,6 +106,7 @@ function charts() {
   const r = range(), cur = DATA.filter(t => inR(t, r) && t.jenis === 'pengeluaran');
   if (!DATA.length) { $('#charts').innerHTML = '<div class="empty"><i>📊</i>Grafik muncul setelah ada transaksi.</div>'; return; }
   $('#charts').innerHTML = ['Pengeluaran per kategori', 'Tren pengeluaran', 'Pemasukan vs pengeluaran'].map((n, i) => `<div class="card"><h3 style="margin:0 0 8px">${n}</h3><canvas id="c${i}"></canvas></div>`).join('');
+  $('#charts').insertAdjacentHTML('afterbegin', analisis(r));
   const bk = {}; cur.forEach(t => bk[t.kategori] = (bk[t.kategori] || 0) + t.jumlah);
   const e = Object.entries(bk).sort((a, b) => b[1] - a[1]);
   const pal = ['#4f7cff', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b'];
@@ -160,6 +161,68 @@ async function hapus() {
   const o = S.edit; if (!confirm(`Hapus transaksi ${o.kategori} sebesar ${rp(o.jumlah)}?\nTindakan ini juga menghapus baris di spreadsheet.`)) return;
   try { await api('delete', { jenis: o.jenis, row: o.row, asli: { tanggal: o.tanggal, kategori: o.kategori, jumlah: o.jumlah } }); closeSheet(); toast('✓ Transaksi dihapus'); load(); }
   catch (e) { toast(e.message, true); }
+}
+
+function analisis(r) {
+  const isSave = k => ['celengan', 'tabungan & investasi'].includes(k.trim().toLowerCase());
+  const wrap = b => `<div class="card"><h3 style="margin:0 0 6px">Evaluasi & Rekomendasi</h3>${b}</div>`;
+  const row = (i, t, d) => `<div class="an"><i>${i}</i><div><b>${t}</b><small>${d}</small></div></div>`;
+  const cur = DATA.filter(t => inR(t, r)), pr = prevRange(r), prv = DATA.filter(t => inR(t, pr));
+  if (cur.length < 3) return wrap('<div class="empty"><i>🌱</i>Data belum cukup untuk dianalisis.<br>Catat beberapa transaksi dulu, ya.</div>');
+  const kons = a => a.filter(t => t.jenis === 'pengeluaran' && !isSave(t.kategori));
+  const tot = a => a.reduce((s, t) => s + t.jumlah, 0);
+  const inc = sum(cur, 'pemasukan'), ek = kons(cur), K = tot(ek);
+  const tab = sum(cur, 'pengeluaran') - K;
+  const days = Math.max(1, diff(r[0], r[1] < today() ? r[1] : today()) + 1), pdays = diff(pr[0], pr[1]) + 1;
+  const pK = tot(kons(prv));
+  const L = []; let st = null, rasio = null;
+
+  if (inc > 0) {
+    const sisa = inc - K; rasio = sisa / inc * 100;
+    if (rasio >= 20) { st = ['Sehat 💪', 'var(--in)']; L.push(row('✅', 'Arus kas sehat', `Kamu menyisihkan ${rasio.toFixed(0)}% dari pemasukan (${rp(sisa)}). Pertahankan!`)); }
+    else if (rasio >= 0) { st = ['Perlu perhatian', '#f59e0b']; L.push(row('⚠️', 'Sisa pemasukan tipis', `Hanya ${rasio.toFixed(0)}% yang tersisa. Target umum sekitar 20%.`)); }
+    else { st = ['Waspada', 'var(--out)']; L.push(row('🚨', 'Pengeluaran melebihi pemasukan', `Selisih ${rp(-sisa)} di periode ini. Cek kategori terbesar di bawah.`)); }
+  } else L.push(row('💡', 'Belum ada pemasukan di periode ini', 'Catat pemasukanmu agar rasio keuangan bisa dihitung.'));
+
+  if (tab > 0) L.push(row('🐷', `Kamu menabung ${rp(tab)}`, 'Celengan dan tabungan tidak dihitung sebagai pengeluaran harian. Bagus!'));
+
+  const bk = {}; ek.forEach(t => bk[t.kategori] = (bk[t.kategori] || 0) + t.jumlah);
+  const top = Object.entries(bk).sort((a, b) => b[1] - a[1])[0];
+  if (top) {
+    const p = top[1] / K * 100;
+    L.push(p >= 40 ? row('⚠️', `${esc(top[0])} paling dominan`, `Menyerap ${p.toFixed(0)}% pengeluaran harianmu. Ini peluang hemat terbesar.`)
+      : row('📊', `Terbesar: ${esc(top[0])} (${p.toFixed(0)}%)`, 'Pengeluaranmu cukup tersebar, tidak ada satu kategori yang mendominasi.'));
+  }
+
+  if (pK > 0) {
+    const base = pK / pdays, ch = (K / days - base) / base * 100;
+    L.push(Math.abs(ch) < 5 ? row('➖', 'Pengeluaran stabil', 'Rata-rata harianmu hampir sama dengan periode lalu.')
+      : ch > 0 ? row('📈', `Pengeluaran harian naik ${ch.toFixed(0)}%`, 'Dibanding periode lalu. Cek kategori yang melonjak di bawah.')
+      : row('📉', `Pengeluaran harian turun ${Math.abs(ch).toFixed(0)}%`, 'Dibanding periode lalu. Hebat, terus lanjutkan!'));
+    const pb = {}; kons(prv).forEach(t => pb[t.kategori] = (pb[t.kategori] || 0) + t.jumlah);
+    const up = Object.entries(bk).map(([k, v]) => { const b = (pb[k] || 0) / pdays, n = v / days; return [k, (n - b) * days, b ? (n - b) / b * 100 : 999]; })
+      .filter(x => x[1] > 50000 && x[2] > 30).sort((a, b) => b[1] - a[1])[0];
+    if (up) L.push(row('🔥', `${esc(up[0])} melonjak`, up[2] >= 999 ? 'Kategori ini baru muncul dibanding periode lalu. Adakah yang bisa ditunda?' : `Naik ${up[2].toFixed(0)}% per hari dibanding periode lalu. Adakah yang bisa ditunda?`));
+  }
+
+  if (diff(r[0], r[1]) >= 2) {
+    const d = {}; ek.forEach(t => d[t.tanggal] = (d[t.tanggal] || 0) + t.jumlah);
+    const m = Object.entries(d).sort((a, b) => b[1] - a[1])[0];
+    if (m && m[1] > 1.5 * K / days) L.push(row('📅', `Hari terboros: ${fmt(m[0])}`, `${rp(m[1])}. Coba ingat pemicunya supaya bisa diantisipasi.`));
+  }
+
+  if (S.per === 'bulan' && days >= 5 && r[1] >= today()) {
+    const proj = K / days * (diff(r[0], r[1]) + 1);
+    L.push(row('🔮', `Proyeksi pengeluaran akhir bulan: ${rp(proj)}`, inc > 0 && proj > inc ? `Dengan laju sekarang, bisa melebihi pemasukan bulan ini (${rp(inc)}).` : 'Berdasarkan laju harianmu saat ini, belum termasuk tabungan.'));
+  }
+
+  const tip = rasio !== null && rasio < 20 && top ? `Langkah kecil: kurangi ${esc(top[0])} sebesar 10% (hemat sekitar ${rp(top[1] * .1)}).`
+    : rasio !== null && rasio >= 20 ? 'Pindahkan sebagian sisa dana ke Celengan agar tidak habis tanpa terasa.'
+    : 'Catat pemasukan dan pengeluaran rutin supaya analisis makin akurat.';
+  L.push(row('🎯', 'Rekomendasi', tip));
+
+  return wrap((st ? `<span class="st" style="color:${st[1]}">${st[0]}</span>` : '') + L.join('') +
+    '<small style="color:var(--m)">Analisis berdasarkan catatanmu pada periode yang dipilih.</small>');
 }
 
 /* ---------- Event ---------- */
