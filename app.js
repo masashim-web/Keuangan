@@ -1,6 +1,6 @@
 const KAT = {
   pengeluaran: ['Celengan','Makan & Minum','Transportasi','Belanja Harian','Tagihan & Utilitas','Pulsa & Internet','Tempat Tinggal','Kesehatan','Pendidikan','Hiburan','Belanja Pribadi','Sosial & Donasi','Cicilan','Tabungan & Investasi','Lainnya'],
-  pemasukan: ['Celengan','Gaji','Bonus','Freelance','Usaha','Investasi','Hadiah','Lainnya']
+  pemasukan: ['Uang Bulanan','Celengan','Gaji','Bonus','Freelance','Usaha','Investasi','Hadiah','Lainnya']
 };
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -57,7 +57,7 @@ function prevRange(r) {
   const n = diff(r[0], r[1]) + 1; return [addDays(r[0], -n), addDays(r[0], -1)];
 }
 
-function render() { home(); $('#home').insertAdjacentHTML('afterbegin', streakCard()); list(); charts(); }
+function render() { home(); $('#home').insertAdjacentHTML('afterbegin', streakCard()); $('#home').insertAdjacentHTML('beforeend', budgetCard()); list(); charts(); }
 
 function home() {
   const r = range(), cur = DATA.filter(t => inR(t, r)), pr = prevRange(r), prv = DATA.filter(t => inR(t, pr));
@@ -328,6 +328,37 @@ $('#home').onclick = e => {
   }
   if (a === 'isi') { openSheet(); $('#tgl').value = d; if (typeof hari === 'function') hari(); }
 };
+
+const ANGGARAN = {
+  'Celengan': 20, 'Makan & Minum': 35, 'Transportasi': 10, 'Pulsa & Internet': 8,
+  'Belanja Harian': 5, 'Hiburan': 7, 'Belanja Pribadi': 5, 'Sosial & Donasi': 3,
+  'Kesehatan': 2, 'Lainnya': 5
+};
+
+function budgetCard() {
+  const d = new Date(), a = iso(new Date(d.getFullYear(), d.getMonth(), 1)), b = iso(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+  const m = DATA.filter(t => t.tanggal >= a && t.tanggal <= b);
+  const same = (t, k) => t.kategori.trim().toLowerCase() === k.toLowerCase();
+  const tot = arr => arr.reduce((s, t) => s + t.jumlah, 0);
+  const base = tot(m.filter(t => t.jenis === 'pemasukan' && same(t, 'Uang Bulanan')));
+  const head = '<h3 style="margin:0 0 6px">Anggaran Bulan Ini</h3>';
+  if (!base) return `<div class="card">${head}<div class="empty" style="padding:16px"><i>💸</i>Catat pemasukan kategori <b>Uang Bulanan</b> untuk membuat pembagian anggaran otomatis.</div></div>`;
+  const sisaHari = Math.max(1, diff(today(), b) + 1);
+  const rows = Object.entries(ANGGARAN).map(([k, p]) => {
+    const jatah = base * p / 100, ce = k === 'Celengan';
+    const pakai = tot(m.filter(t => same(t, k) && t.jenis === (ce ? 'pemasukan' : 'pengeluaran')));
+    const pct = pakai / jatah * 100;
+    const cls = ce ? '' : pct > 100 ? 'x' : pct >= 75 ? 'w' : '';
+    const note = ce ? (pakai >= jatah ? 'Target menabung tercapai 🎉' : `Kurang ${rp(jatah - pakai)} lagi untuk target`)
+      : pakai > jatah ? `Lewat ${rp(pakai - jatah)} dari jatah`
+      : `Sisa ${rp(jatah - pakai)} · sekitar ${rp((jatah - pakai) / sisaHari)} per hari`;
+    return `<div class="bgr"><div><b>${esc(k)} <span style="color:var(--m);font-weight:400">${p}%</span></b><span>${rp(pakai)} / ${rp(jatah)}</span></div>
+      <div class="bar"><i class="${cls}" style="width:${Math.min(100, pct)}%"></i></div><small>${note}</small></div>`;
+  }).join('');
+  const luar = tot(m.filter(t => t.jenis === 'pengeluaran' && !Object.keys(ANGGARAN).some(k => same(t, k))));
+  return `<div class="card">${head}<small style="color:var(--m)">Dari Uang Bulanan ${rp(base)}</small>${rows}
+    ${luar ? `<div class="ins"><span>Di luar anggaran</span><b>${rp(luar)}</b></div>` : ''}</div>`;
+}
 
 /* ---------- Event ---------- */
 function go(v) {
