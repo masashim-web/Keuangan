@@ -1,6 +1,6 @@
 const KAT = {
   pengeluaran: ['Celengan','Makan & Minum','Transportasi','Belanja Harian','Tagihan & Utilitas','Pulsa & Internet','Tempat Tinggal','Kesehatan','Pendidikan','Hiburan','Belanja Pribadi','Sosial & Donasi','Cicilan','Tabungan & Investasi','Lainnya'],
-  pemasukan: ['Uang Bulanan','Celengan','Gaji','Bonus','Freelance','Usaha','Investasi','Hadiah','Lainnya']
+  pemasukan: ['Anggaran Bulanan','Uang Bulanan','Celengan','Gaji','Bonus','Freelance','Usaha','Investasi','Hadiah','Lainnya']
 };
 
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
