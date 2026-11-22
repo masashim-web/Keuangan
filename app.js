@@ -37,7 +37,9 @@ async function load() {
   $('#home').innerHTML = '<div class="sk"></div><div class="sk"></div><div class="sk"></div>';
   try {
     const d = await api('list');
-    DATA = [...d.pemasukan.map(t => ({ ...t, jenis: 'pemasukan' })), ...d.pengeluaran.map(t => ({ ...t, jenis: 'pengeluaran' }))];
+    ALL = [...d.pemasukan.map(t => ({ ...t, jenis: 'pemasukan' })), ...d.pengeluaran.map(t => ({ ...t, jenis: 'pengeluaran' }))];
+    const isRef = t => t.jenis === 'pemasukan' && t.kategori.trim().toLowerCase() === 'uang bulanan';
+    REF = ALL.filter(isRef); DATA = ALL.filter(t => !isRef(t));
     STREAK = d.streak || [];
     render(); maybeFx();
   } catch (e) {
@@ -57,7 +59,7 @@ function prevRange(r) {
   const n = diff(r[0], r[1]) + 1; return [addDays(r[0], -n), addDays(r[0], -1)];
 }
 
-function render() { home(); $('#home').insertAdjacentHTML('afterbegin', streakCard()); $('#home').insertAdjacentHTML('beforeend', budgetCard()); list(); charts(); }
+function render() { home(); $('#home').insertAdjacentHTML('afterbegin', streakCard()); $('#home').insertAdjacentHTML('beforeend', anggaranCard()); list(); charts(); }
 
 function home() {
   const r = range(), cur = DATA.filter(t => inR(t, r)), pr = prevRange(r), prv = DATA.filter(t => inR(t, pr));
@@ -82,7 +84,7 @@ function home() {
 
 function list() {
   const q = $('#q').value.toLowerCase(), k = $('#fk').value, a = $('#rf1').value, b = $('#rf2').value;
-  const rows = DATA.filter(t => (!k || t.kategori === k) && (!a || t.tanggal >= a) && (!b || t.tanggal <= b) &&
+  const rows = ALL.filter(t => (!k || t.kategori === k) && (!a || t.tanggal >= a) && (!b || t.tanggal <= b) &&
     (!q || (t.kategori + ' ' + t.catatan).toLowerCase().includes(q)))
     .sort((x, y) => y.tanggal.localeCompare(x.tanggal) || y.row - x.row).slice(0, 200);
   $('#list').innerHTML = rows.length ? rows.map(t => `
@@ -127,6 +129,7 @@ function charts() {
 /* ---------- Sheet tambah/edit ---------- */
 function drawKats() {
   $('#kats').innerHTML = KAT[S.jenis].map(k => `<button class="${k === S.kat ? 'on' : ''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
+  sisaInfo();
 }
 function openSheet(t) {
   S.edit = t || null; S.jenis = t ? t.jenis : 'pengeluaran'; S.kat = t ? t.kategori : '';
@@ -360,6 +363,65 @@ function budgetCard() {
     ${luar ? `<div class="ins"><span>Di luar anggaran</span><b>${rp(luar)}</b></div>` : ''}</div>`;
 }
 
+let ALL = [], REF = [];
+
+function budgetData() {
+  const d = new Date(), a = iso(new Date(d.getFullYear(), d.getMonth(), 1)), b = iso(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+  const inM = t => t.tanggal >= a && t.tanggal <= b;
+  const tot = arr => arr.reduce((s, t) => s + t.jumlah, 0);
+  const same = (t, k) => t.kategori.trim().toLowerCase() === k.toLowerCase();
+  const base = tot(REF.filter(inM));
+  const items = Object.entries(ANGGARAN).map(([k, p]) => {
+    const ce = k === 'Celengan', jatah = base * p / 100;
+    const pakai = tot(DATA.filter(t => inM(t) && same(t, k) && t.jenis === (ce ? 'pemasukan' : 'pengeluaran')));
+    return { k, p, ce, jatah, pakai };
+  });
+  const luar = tot(DATA.filter(t => inM(t) && t.jenis === 'pengeluaran' && !Object.keys(ANGGARAN).some(k => same(t, k))));
+  return { a, b, base, items, luar };
+}
+
+function anggaranCard() {
+  const B = budgetData(), head = '<h3 style="margin:0 0 6px">Anggaran Bulan Ini</h3>';
+  if (!B.base) return `<div class="card">${head}<div class="empty" style="padding:16px"><i>💸</i>Catat pemasukan kategori <b>Uang Bulanan</b> untuk membuat pembagian anggaran otomatis.</div></div>`;
+  const sisaHari = Math.max(1, diff(today(), B.b) + 1);
+  const rows = B.items.map(({ k, p, ce, jatah, pakai }) => {
+    const pct = pakai / jatah * 100;
+    const cls = ce ? '' : pct > 100 ? 'x' : pct >= 75 ? 'w' : '';
+    const note = ce ? (pakai >= jatah ? 'Target menabung tercapai 🎉' : `Kurang ${rp(jatah - pakai)} lagi untuk target`)
+      : pakai > jatah ? `Lewat ${rp(pakai - jatah)} dari jatah`
+      : `Sisa ${rp(jatah - pakai)} · sekitar ${rp((jatah - pakai) / sisaHari)} per hari`;
+    return `<div class="bgr"><div><b>${esc(k)} <span style="color:var(--m);font-weight:400">${p}%</span></b><span>${rp(pakai)} / ${rp(jatah)}</span></div>
+      <div class="bar"><i class="${cls}" style="width:${Math.min(100, pct)}%"></i></div><small>${note}</small></div>`;
+  }).join('');
+  const sp = B.items.filter(x => !x.ce);
+  const J = sp.reduce((s, x) => s + x.jatah, 0), P = sp.reduce((s, x) => s + x.pakai, 0);
+  const wkt = (diff(B.a, today()) + 1) / (diff(B.a, B.b) + 1) * 100, pem = P / J * 100;
+  const lewat = sp.filter(x => x.pakai > x.jatah).map(x => esc(x.k));
+  const status = lewat.length ? `⚠️ Melebihi jatah: ${lewat.join(', ')}`
+    : pem <= wkt ? `✅ Di jalur: terpakai ${pem.toFixed(0)}% dari jatah, bulan berjalan ${wkt.toFixed(0)}%`
+    : `⚠️ Terpakai ${pem.toFixed(0)}% padahal bulan baru berjalan ${wkt.toFixed(0)}%. Rem sedikit ya.`;
+  return `<div class="card">${head}<small style="color:var(--m)">Acuan: Uang Bulanan ${rp(B.base)} (tidak masuk Saldo bersih)</small>
+    <div style="margin:10px 0 4px;font-size:14px;font-weight:600">${status}</div>${rows}
+    ${B.luar ? `<div class="ins"><span>Di luar anggaran</span><b>${rp(B.luar)}</b></div>` : ''}</div>`;
+}
+
+function sisaInfo() {
+  let el = $('#sisa');
+  if (!el) { el = document.createElement('div'); el.id = 'sisa'; $('#kats').after(el); }
+  el.className = 'sisa'; el.textContent = '';
+  if (!S.kat) return;
+  const kn = S.kat.trim().toLowerCase();
+  if (S.jenis === 'pemasukan' && kn === 'uang bulanan') { el.textContent = 'ℹ️ Uang Bulanan hanya acuan anggaran, tidak masuk Saldo bersih.'; return; }
+  const B = budgetData(); if (!B.base) return;
+  const it = B.items.find(x => x.k.toLowerCase() === kn && x.ce === (S.jenis === 'pemasukan'));
+  if (!it) return;
+  const o = S.edit, own = o && o.jenis === S.jenis && o.kategori.trim().toLowerCase() === kn && o.tanggal >= B.a && o.tanggal <= B.b ? o.jumlah : 0;
+  const pakai = it.pakai - own, amt = Number($('#nom').value.replace(/\D/g, '')) || 0, sisa = it.jatah - pakai - amt;
+  if (it.ce) { el.textContent = `🎯 Target celengan ${rp(it.jatah)} · ` + (sisa > 0 ? `kurang ${rp(sisa)}` : 'tercapai 🎉'); return; }
+  el.textContent = `Jatah ${it.k}: sisa ${rp(it.jatah - pakai)}` + (amt ? (sisa >= 0 ? ` → setelah ini ${rp(sisa)}` : ` → lewat ${rp(-sisa)} dari jatah`) : '');
+  if (sisa < 0) el.className = 'sisa bad';
+}
+
 /* ---------- Event ---------- */
 function go(v) {
   S.view = v; $$('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v));
@@ -376,8 +438,8 @@ $('#cf').onchange = $('#ct').onchange = render;
 $('#mode').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.mode = b.dataset.m; $$('#mode button').forEach(x => x.classList.toggle('on', x === b)); charts(); };
 $('#jenis').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.jenis = b.dataset.j; S.kat = ''; $$('#jenis button').forEach(x => x.classList.toggle('on', x === b)); drawKats(); };
 $('#kats').onclick = e => { const b = e.target.closest('button'); if (b) { S.kat = b.dataset.k; drawKats(); } };
-$('#nom').oninput = e => { const n = e.target.value.replace(/\D/g, ''); e.target.value = n ? Number(n).toLocaleString('id-ID') : ''; };
-$('#list').onclick = e => { const it = e.target.closest('.item'); if (!it) return; const [j, r] = it.dataset.id.split(':'); openSheet(DATA.find(t => t.jenis === j && t.row === +r)); };
+$('#nom').oninput = e => { const n = e.target.value.replace(/\D/g, ''); e.target.value = n ? Number(n).toLocaleString('id-ID') : ''; sisaInfo(); };
+$('#list').onclick = e => { const it = e.target.closest('.item'); if (!it) return; const [j, r] = it.dataset.id.split(':'); openSheet(ALL.find(t => t.jenis === j && t.row === +r)); };
 ['#q', '#fk', '#rf1', '#rf2'].forEach(s => $(s).oninput = list);
 $('#fk').innerHTML = '<option value="">Semua kategori</option>' + [...new Set([...KAT.pengeluaran, ...KAT.pemasukan])].map(k => `<option>${esc(k)}</option>`).join('');
 $('#s-url').value = localStorage.getItem('url') || '';
