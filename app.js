@@ -38,7 +38,8 @@ async function load() {
   try {
     const d = await api('list');
     DATA = [...d.pemasukan.map(t => ({ ...t, jenis: 'pemasukan' })), ...d.pengeluaran.map(t => ({ ...t, jenis: 'pengeluaran' }))];
-    render();
+    STREAK = d.streak || [];
+    render(); maybeFx();
   } catch (e) {
     $('#home').innerHTML = `<div class="empty"><i>⚠️</i>${esc(e.message)}<br><br><button class="primary" onclick="load()">Coba lagi</button></div>`;
   }
@@ -56,7 +57,7 @@ function prevRange(r) {
   const n = diff(r[0], r[1]) + 1; return [addDays(r[0], -n), addDays(r[0], -1)];
 }
 
-function render() { home(); list(); charts(); }
+function render() { home(); $('#home').insertAdjacentHTML('afterbegin', streakCard()); list(); charts(); }
 
 function home() {
   const r = range(), cur = DATA.filter(t => inR(t, r)), pr = prevRange(r), prv = DATA.filter(t => inR(t, pr));
@@ -248,6 +249,85 @@ function analisis(r) {
   return wrap((st ? `<span class="st" style="color:${st[1]}">${st[0]}</span>` : '') + L.join('') +
     '<small style="color:var(--m)">Analisis berdasarkan catatanmu pada periode yang dipilih.</small>');
 }
+
+let STREAK = [];
+const STH = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+function streakInfo() {
+  const t = today();
+  const rec = new Set([...DATA.map(x => x.tanggal), ...STREAK.filter(x => x.jenis === 'Kosong').map(x => x.tanggal)]);
+  const sh = new Set(STREAK.filter(x => x.jenis === 'Tameng').map(x => x.tanggal));
+  const all = [...rec, ...sh].filter(d => d <= t).sort();
+  const I = { t, rec, sh, n: 0, best: 0, tameng: 0, done: rec.has(t) || sh.has(t), gaps: [], first: all[0] || t };
+  if (!all.length) return I;
+  const lim = addDays(t, -365);
+  let n = 0;
+  for (let d = all[0] < lim ? lim : all[0]; d <= t; d = addDays(d, 1)) {
+    if (rec.has(d)) { n++; if (n % 7 === 0) I.tameng = Math.min(2, I.tameng + 1); }
+    else if (sh.has(d)) { n++; I.tameng = Math.max(0, I.tameng - 1); }
+    else if (d < t) n = 0;
+    I.best = Math.max(I.best, n);
+  }
+  I.n = n;
+  for (let i = 3; i >= 1; i--) { const d = addDays(t, -i); if (d > I.first && !rec.has(d) && !sh.has(d)) I.gaps.push(d); }
+  return I;
+}
+
+function strip(I) {
+  let h = '';
+  for (let i = 6; i >= 0; i--) {
+    const d = addDays(I.t, -i);
+    const s = I.rec.has(d) ? 'on' : I.sh.has(d) ? 'sh' : d === I.t ? 'now' : d < I.first ? 'no' : 'miss';
+    h += `<div class="cw"><div class="cn ${s}" style="--i:${6 - i}">${s === 'sh' ? '🛡️' : s === 'on' ? 'Rp' : ''}</div><small>${STH[parse(d).getDay()]}</small></div>`;
+  }
+  return h;
+}
+
+function streakCard() {
+  const I = streakInfo();
+  const msg = I.done ? 'Aman untuk hari ini ✓ Sampai ketemu besok!'
+    : I.n > 0 ? `Catat hari ini supaya streak ${I.n} harimu berlanjut.`
+    : I.best > 0 ? `Mulai lagi hari ini. Rekormu ${I.best} hari, pasti bisa kamu kejar!`
+    : 'Catat transaksi pertamamu hari ini untuk memulai streak.';
+  const gaps = I.gaps.map(d => `<div class="gap"><span>⚠️ ${STH[parse(d).getDay()]} ${d.slice(8)}/${d.slice(5, 7)} terlewat</span><button data-a="tameng" data-d="${d}">🛡️ Tameng</button><button data-a="isi" data-d="${d}">Isi catatan</button></div>`).join('');
+  return `<div class="card"><div class="stk"><div class="sn"><b>${I.n}</b><span>hari streak uang</span></div><small style="color:var(--m)">Rekor ${I.best}</small></div>
+    <div class="cs">${strip(I)}</div><div style="font-size:14px">${msg}</div>
+    ${I.done ? '' : '<button class="ghost" data-a="kosong" style="margin-top:10px;padding:12px;font-size:15px">Tidak ada transaksi hari ini</button>'}
+    ${gaps}
+    <div class="sw">${'🛡️'.repeat(I.tameng)}${'<span style="opacity:.25">🛡️</span>'.repeat(2 - I.tameng)} Tameng · dapat 1 tiap kelipatan 7 hari (maks 2)</div></div>`;
+}
+
+function maybeFx() {
+  const I = streakInfo();
+  if (!I.done || I.n < 1 || localStorage.getItem('fxDay') === I.t) return;
+  localStorage.setItem('fxDay', I.t);
+  let fx = $('#fx');
+  if (!fx) { fx = document.createElement('div'); fx.id = 'fx'; document.body.appendChild(fx); }
+  const cap = I.n % 7 === 0 ? `🎉 ${I.n} hari! Kamu dapat Tameng baru 🛡️` : I.n === 1 ? 'Streak dimulai! Besok lanjut lagi ya.' : `Kamu mencatat ${I.n} hari berturut-turut. Keren!`;
+  const rain = Array.from({ length: Math.min(I.n, 30) }, () => `<i class="rain" style="left:${Math.random() * 94}%;animation-duration:${2.4 + Math.random() * 2}s;animation-delay:${Math.random() * 1.4}s"></i>`).join('');
+  fx.innerHTML = rain + `<div class="fxb"><div class="fxn">0</div><div style="font-weight:600;font-size:20px;margin:4px 0 18px">hari streak uang</div><div class="cs">${strip(I)}</div><p>${cap}</p><small style="color:var(--m)">Ketuk untuk menutup</small></div>`;
+  fx.hidden = false;
+  const el = fx.querySelector('.fxn'), step = Math.max(1, Math.ceil(I.n / 20));
+  let i = 0;
+  const iv = setInterval(() => { i = Math.min(I.n, i + step); el.textContent = i; if (i >= I.n) clearInterval(iv); }, 45);
+  const close = () => { fx.hidden = true; clearInterval(iv); clearTimeout(tm); };
+  const tm = setTimeout(close, 5500);
+  fx.onclick = close;
+}
+
+async function stCek(d, kind, ok) {
+  try { await api('streak', { tanggal: d, kind }); toast(ok); load(); } catch (e) { toast(e.message, true); }
+}
+$('#home').onclick = e => {
+  const b = e.target.closest('[data-a]'); if (!b) return;
+  const a = b.dataset.a, d = b.dataset.d;
+  if (a === 'kosong') stCek(today(), 'Kosong', '✓ Tercatat: tidak ada transaksi hari ini');
+  if (a === 'tameng') {
+    if (streakInfo().tameng < 1) return toast('Belum punya Tameng. Isi catatan untuk tanggal itu saja.', true);
+    stCek(d, 'Tameng', '🛡️ Streak diselamatkan!');
+  }
+  if (a === 'isi') { openSheet(); $('#tgl').value = d; if (typeof hari === 'function') hari(); }
+};
 
 /* ---------- Event ---------- */
 function go(v) {
