@@ -77,5 +77,13 @@ canvas{max-height:260px}
 .rain{position:absolute;top:-50px;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff3b0,#fbbf24 55%,#d97706);border:2px solid #f5b301;animation:fall linear forwards}
 @keyframes fall{to{transform:translateY(115vh) rotateY(720deg)}}
 @media(prefers-reduced-motion:reduce){.rain{display:none}.cn,.fxn{animation:none!important}}
+.bgr{padding:10px 0;border-bottom:1px solid var(--l)}
+.bgr:last-of-type{border:0}
+.bgr>div:first-child{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.bar{height:8px;border-radius:99px;background:#eef1fa;margin:6px 0 4px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--g);transition:width .6s ease}
+.bar i.w{background:#f59e0b}
+.bar i.x{background:var(--out)}
+.bgr small{color:var(--m);font-size:12px}
 .sisa{font-size:13px;color:var(--m);margin-top:8px}
 .sisa.bad{color:var(--out);font-weight:600}
