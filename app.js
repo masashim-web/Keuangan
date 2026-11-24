@@ -59,7 +59,7 @@ function prevRange(r) {
   const n = diff(r[0], r[1]) + 1; return [addDays(r[0], -n), addDays(r[0], -1)];
 }
 
-function render() { home(); $('#home').insertAdjacentHTML('afterbegin', streakCard()); $('#home').insertAdjacentHTML('beforeend', anggaranCard()); list(); charts(); }
+function render() { home(); $('#home').insertAdjacentHTML('afterbegin', streakCard()); $('#home').insertAdjacentHTML('beforeend', anggaranCard()); applyHide(); list(); charts(); }
 
 function home() {
   const r = range(), cur = DATA.filter(t => inR(t, r)), pr = prevRange(r), prv = DATA.filter(t => inR(t, pr));
@@ -293,7 +293,7 @@ function streakCard() {
     : I.best > 0 ? `Mulai lagi hari ini. Rekormu ${I.best} hari, pasti bisa kamu kejar!`
     : 'Catat transaksi pertamamu hari ini untuk memulai streak.';
   const gaps = I.gaps.map(d => `<div class="gap"><span>⚠️ ${STH[parse(d).getDay()]} ${d.slice(8)}/${d.slice(5, 7)} terlewat</span><button data-a="tameng" data-d="${d}">🛡️ Tameng</button><button data-a="isi" data-d="${d}">Isi catatan</button></div>`).join('');
-  return `<div class="card"><div class="stk"><div class="sn"><b>${I.n}</b><span>hari streak uang</span></div><small style="color:var(--m)">Rekor ${I.best}</small></div>
+  return `<div class="card" id="stc" style="cursor:pointer"><div class="stk"><div class="sn"><b>${I.n}</b><span>hari streak uang</span></div><small style="color:var(--m)">Rekor ${I.best} · 📅</small></div>
     <div class="cs">${strip(I)}</div><div style="font-size:14px">${msg}</div>
     ${I.done ? '' : '<button class="ghost" data-a="kosong" style="margin-top:10px;padding:12px;font-size:15px">Tidak ada transaksi hari ini</button>'}
     ${gaps}
@@ -322,7 +322,10 @@ async function stCek(d, kind, ok) {
   try { await api('streak', { tanggal: d, kind }); toast(ok); load(); } catch (e) { toast(e.message, true); }
 }
 $('#home').onclick = e => {
-  const b = e.target.closest('[data-a]'); if (!b) return;
+  const hc = e.target.closest('[data-hk]');
+  if (hc) return toggleHide(hc.dataset.hk);
+  const b = e.target.closest('[data-a]');
+  if (!b) { if (e.target.closest('#stc')) openCal(); return; }
   const a = b.dataset.a, d = b.dataset.d;
   if (a === 'kosong') stCek(today(), 'Kosong', '✓ Tercatat: tidak ada transaksi hari ini');
   if (a === 'tameng') {
@@ -420,6 +423,70 @@ function sisaInfo() {
   if (it.ce) { el.textContent = `🎯 Target celengan ${rp(it.jatah)} · ` + (sisa > 0 ? `kurang ${rp(sisa)}` : 'tercapai 🎉'); return; }
   el.textContent = `Jatah ${it.k}: sisa ${rp(it.jatah - pakai)}` + (amt ? (sisa >= 0 ? ` → setelah ini ${rp(sisa)}` : ` → lewat ${rp(-sisa)} dari jatah`) : '');
   if (sisa < 0) el.className = 'sisa bad';
+}
+
+const BLN = ym => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }); };
+const addM = (ym, k) => { const [y, m] = ym.split('-').map(Number); return iso(new Date(y, m - 1 + k, 1)).slice(0, 7); };
+
+function calHTML(I, ym) {
+  const [y, m] = ym.split('-').map(Number), first = iso(new Date(y, m - 1, 1)), nd = new Date(y, m, 0).getDate();
+  const off = (parse(first).getDay() + 6) % 7, weeks = Math.ceil((off + nd) / 7), cur = I.t.slice(0, 7);
+  const mark = d => I.rec.has(d) || I.sh.has(d);
+  let g = ['S', 'S', 'R', 'K', 'J', 'S', 'M', ''].map(x => `<div class="ch">${x}</div>`).join(''), cnt = 0;
+  for (let w = 0; w < weeks; w++) {
+    let n = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(first, w * 7 + i - off), inM = d.slice(0, 7) === ym;
+      const cls = !inM ? 'o' : I.rec.has(d) ? 'on' : I.sh.has(d) ? 'sh' : d === I.t ? 'now' : d > I.t ? 'fu' : d > I.first ? 'miss' : '';
+      if (inM && mark(d)) cnt++;
+      if (mark(d)) n++;
+      g += `<div class="cd ${cls}${d === I.t ? ' td' : ''}">${cls === 'sh' ? '🛡️' : +d.slice(8)}</div>`;
+    }
+    g += `<div class="wk ${n === 7 ? 'ok' : ''}">${n === 7 ? '✓' : n + '/7'}</div>`;
+  }
+  const prev = ym > I.first.slice(0, 7) ? addM(ym, -1) : '', next = ym < cur ? addM(ym, 1) : '';
+  const gaps = ym === cur ? I.gaps.map(d => `<div class="gap"><span>⚠️ ${STH[parse(d).getDay()]} ${d.slice(8)}/${d.slice(5, 7)} terlewat</span><button data-a="tameng" data-d="${d}">🛡️ Tameng</button><button data-a="isi" data-d="${d}">Isi catatan</button></div>`).join('') : '';
+  return `<div class="panel">
+    <div class="cnav"><button data-cm="${prev}" ${prev ? '' : 'disabled'}>‹</button><b>${BLN(ym)}</b><button data-cm="${next}" ${next ? '' : 'disabled'}>›</button></div>
+    <div class="cst"><div><small>Streak sekarang</small><b>🔥 ${I.n} hari</b></div><div><small>Rekor</small><b>${I.best} hari</b></div><div><small>Tercatat bulan ini</small><b>${cnt} hari</b></div></div>
+    <div class="cg">${g}</div>
+    <div class="leg">🟡 Tercatat · 🛡️ Tameng · 🔴 Terlewat · ⚪ Belum</div>
+    ${gaps}
+    <button class="ghost" data-x>Tutup</button></div>`;
+}
+
+function openCal(ym) {
+  const I = streakInfo();
+  let el = $('#cal');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'cal'; document.body.appendChild(el);
+    el.onclick = e => {
+      if (e.target.id === 'cal' || e.target.closest('[data-x]')) return closeCal();
+      const nv = e.target.closest('[data-cm]');
+      if (nv) return nv.dataset.cm && openCal(nv.dataset.cm);
+      if (e.target.closest('[data-a]')) { closeCal(); $('#home').onclick(e); }
+    };
+  }
+  el.innerHTML = calHTML(I, ym || I.t.slice(0, 7)); el.hidden = false;
+}
+function closeCal() { const el = $('#cal'); if (el) el.hidden = true; }
+
+const HIDE = () => { try { return JSON.parse(localStorage.getItem('hide')) || {}; } catch (e) { return {}; } };
+function applyHide() {
+  const h = HIDE();
+  $$('#home .hero').forEach(c => {
+    const s = (c.querySelector('small') || {}).textContent || '';
+    const k = s.includes('Saldo bersih') ? 'saldo' : s.includes('Celengan') ? 'celengan' : '';
+    if (!k) return;
+    const o = c.querySelector('.eye'); if (o) o.remove();
+    c.dataset.hk = k; c.classList.toggle('hid', !!h[k]);
+    c.insertAdjacentHTML('afterbegin', `<span class="eye">${h[k] ? '🙈' : '👁️'}</span>`);
+  });
+}
+function toggleHide(k) {
+  const h = HIDE(); h[k] = !h[k];
+  try { localStorage.setItem('hide', JSON.stringify(h)); } catch (e) {}
+  applyHide();
 }
 
 /* ---------- Event ---------- */
